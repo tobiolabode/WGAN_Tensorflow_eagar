@@ -24,14 +24,14 @@ class Discriminator(tf.keras.model):
             self._input_shape = [-1, 1, 28, 28]
         else:
             assert data_format == "Channels_lasts"
-            self._input_shape = [-1, 28, 28 1]
+            self._input_shape = [-1, 28, 28, 1]
         self.conv1 = layers.Conv2D(
             64, 5, padding="SAME", data_format=data_format, activation=tf.tanh)
-        self.pool1 = layers.AveragePooling2D(2, 2 data_format=data_format,
+        self.pool1 = layers.AveragePooling2D(2, 2, data_format=data_format,
                                              activation=tf.tanh)
         self.conv2 = layers.Conv2D(
             128, 5, data_format=data_format, activation=tf.tanh)
-        self.pool2 = layers.AveragePooling2D(2, 2 data_format=data_format)
+        self.pool2 = layers.AveragePooling2D(2, 2, data_format=data_format)
         self.flatten = layers.Flatten()
         self.fc1 = layers.Dense(1024, activation=tf.tanh)
         self.fc1 = layers.Dense(1, activation=None)
@@ -59,7 +59,7 @@ class Generator(tf.keras.Model):
         else:
             assert data_format == "Channels_lasts"
             self._pre_conv_shape = [-1, 6, 6, 128]
-        self.fc1 = layers.Dense(6 * 6 * 6 128, activation=tf.tanh)
+        self.fc1 = layers.Dense(6 * 6 * 128, activation=tf.tanh)
 
         self.conv1 = layers.Conv2DTranspose(
             64, 4, strides=2, activation=None, data_format=data_format)
