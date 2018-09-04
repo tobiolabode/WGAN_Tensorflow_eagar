@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import tensorflow as tf
 from tensorflow.examples.tutorials.mnist import input_data
+import argparse
 
 layers = tf.keras.layers
 
@@ -131,5 +132,115 @@ def train_one_epoch(generator, discriminator, generator_optimizer,
                                             discriminator.variables)
 
     generator_optimizer.apply_gradient(
+        zip(generator_grad, generator.variables))
+    discriminator.apply_gradient(
+        zip(discriminator_grad, discriminator.variables))
 
-    )
+    if log_interval and batch_index > 0 and batch_index % log_interval == 0:
+        print("Batch #%d\tAverage Generator Loss: %.6f\t"
+        "Average Discriminator Loss: %.6f" %
+        (batch_index, total_generator_loss / batch_index,
+        total_discriminator_loss / batch_index))
+
+
+def main(_):
+     (device, data_format) = ('/gpu:0', 'channels_first')
+  if FLAGS.no_gpu or tf.contrib.eager.num_gpus() <= 0:
+    (device, data_format) = ('/cpu:0', 'channels_last')
+  print('Using device %s, and data format %s.' % (device, data_format))
+
+  # Load the datasets
+  data = input_data.read_data_sets(FLAGS.data_dir)
+  dataset = (
+      tf.data.Dataset.from_tensor_slices(data.train.images).shuffle(60000)
+      .batch(FLAGS.batch_size))
+  model_objects = {
+      'generator': Generator(data_format),
+      'discriminator': Discriminator(data_format),
+      'generator_optimizer': tf.train.AdamOptimizer(FLAGS.lr),
+      'discriminator_optimizer': tf.train.AdamOptimizer(FLAGS.lr),
+      'step_counter': tf.train.get_or_create_global_step(),
+}
+
+  summary_writer = tf.contrib.summary.create_summary_file_writer(
+      FLAGS.output_dir, flush_millis=1000)
+  checkpoint_prefix = os.path.join(FLAGS.checkpoint_dir, 'ckpt')
+  latest_cpkt = tf.train.latest_checkpoint(FLAGS.checkpoint_dir)
+  if latest_cpkt:
+    print('Using latest checkpoint at ' + latest_cpkt)
+  checkpoint = tf.train.Checkpoint(**model_objects)
+  # Restore variables on creation if a checkpoint exists.
+checkpoint.restore(latest_cpkt)
+
+
+  with tf.device(device):
+    for _ in range(100):
+      start = time.time()
+      with summary_writer.as_default():
+        train_one_epoch(dataset=dataset, log_interval=FLAGS.log_interval,
+                        noise_dim=FLAGS.noise, **model_objects)
+
+
+      end = time.time()
+      checkpoint.save(checkpoint_prefix)
+      print('\nTrain time for epoch #%d (step %d): %f' %
+            (checkpoint.save_counter.numpy(),
+             checkpoint.step_counter.numpy(),
+                                end - start))
+
+if __name__ == '__main__':
+  tf.enable_eager_execution()
+
+  parser = argparse.ArgumentParser()
+  parser.add_argument(
+      '--data-dir',
+      type=str,
+      default='/tmp/tensorflow/mnist/input_data',
+      help=('Directory for storing input data (default '
+            '/tmp/tensorflow/mnist/input_data)'))
+  parser.add_argument(
+      '--batch-size',
+      type=int,
+      default=128,
+      metavar='N',
+      help='input batch size for training (default: 128)')
+  parser.add_argument(
+      '--log-interval',
+      type=int,
+      default=100,
+      metavar='N',
+      help=('number of batches between logging and writing summaries '
+            '(default: 100)'))
+  parser.add_argument(
+      '--output_dir',
+      type=str,
+      default=None,
+      metavar='DIR',
+      help='Directory to write TensorBoard summaries (defaults to none)')
+  parser.add_argument(
+      '--checkpoint_dir',
+      type=str,
+      default='/tmp/tensorflow/mnist/checkpoints/',
+      metavar='DIR',
+      help=('Directory to save checkpoints in (once per epoch) (default '
+            '/tmp/tensorflow/mnist/checkpoints/)'))
+  parser.add_argument(
+      '--lr',
+      type=float,
+      default=0.001,
+      metavar='LR',
+      help='learning rate (default: 0.001)')
+  parser.add_argument(
+      '--noise',
+      type=int,
+      default=100,
+      metavar='N',
+      help='Length of noise vector for generator input (default: 100)')
+  parser.add_argument(
+      '--no-gpu',
+      action='store_true',
+      default=False,
+      help='disables GPU usage even if a GPU is available')
+
+  FLAGS, unparsed = parser.parse_known_args()
+tf.app.run(main=main, argv=[sys.argv[0]] + unparsed)
