@@ -57,7 +57,7 @@ class Generator(tf.keras.Model):
         if data_format == "channels_first":
             self._pre_conv_shape = [-1, 128, 6, 6]
         else:
-            assert data_format == "channels_lasts"
+            assert data_format == "channels_last"
             self._pre_conv_shape = [-1, 6, 6, 128]
         self.fc1 = layers.Dense(6 * 6 * 128, activation=tf.tanh)
 
