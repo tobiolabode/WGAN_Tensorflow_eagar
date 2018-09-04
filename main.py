@@ -23,7 +23,7 @@ class Discriminator(tf.keras.Model):
         if data_format == "channels_first":
             self._input_shape = [-1, 1, 28, 28]
         else:
-            assert data_format == "channels_lasts"
+            assert data_format == "channels_last"
             self._input_shape = [-1, 28, 28, 1]
         self.conv1 = layers.Conv2D(
             64, 5, padding="SAME", data_format=data_format, activation=tf.tanh)
