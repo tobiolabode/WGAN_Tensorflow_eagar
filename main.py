@@ -80,9 +80,56 @@ def discriminator_loss(discriminator_real_outputs, discriminator_gen_outputs):
     return loss
 
 
-def generator_loss(arg):
+def generator_loss(discriminator_gen_outputs):
 
     loss = tf.losses.sigmoid_cross_entropy(
         tf.ones_like(discriminator_gen_outputs), discriminator_gen_outputs)
         tf.contrib.summary.scalar("generator_loss", loss)
         return loss
+
+
+def train_one_epoch(generator, discriminator, generator_optimizer,
+                    discriminator_optimizer, dataset, step_counter,
+                    log_interval, noise_dim):
+
+    total_generator_loss = 0.0
+    total_discriminator_loss = 0.0
+    for (batch_index, images) in enumerate(dataset):
+        with tf.device("/cpu:0"):
+            tf.assign_add(step_counter, 1)
+
+    with tf.contrib.summary.record_summaries_every_n_global_steps(
+            log_interval, global_step=step_counter):
+        current_batch_size = images.shape[0]
+        noise = tf.random_uniform(
+            shape=[current_batch_size, noise_dim],
+            minval=-1.,
+            maxval=1.,
+            seed=batch_index)
+
+    with tf.GradientTape() as gen_tape,  tf.GradientTape() as disc_tape:
+        generated_images = generator(noise)
+        tf.contrib.summary.image(
+            'generated_images',
+            tf.reshape(generated_images, [-1 28 28 1]),
+            max_images=10)
+
+        discriminator_gen_outputs = discriminator(generated_images)
+        discriminator_real_outputs = discriminator(images)
+        discriminator_loss_val = discriminator(discriminator_real_outputs,
+                                               discriminator_gen_outputs)
+
+        total_discriminator_loss += discriminator_loss_val
+
+        generator_loss_val = generator_loss(discriminator_gen_outputs)
+        total_generator_loss += generator_loss_val
+
+    generator_grad = gen_tape.gradient(generator_loss_val,
+                                       generator.variables)
+
+    discriminator_grad = disc_tape.gradient(discriminator_loss_val,
+                                            discriminator.variables)
+
+    generator_optimizer.apply_gradient(
+
+    )
