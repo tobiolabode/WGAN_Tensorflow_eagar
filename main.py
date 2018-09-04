@@ -15,7 +15,7 @@ FLAGS = None
 layers = tf.keras.layers
 
 
-class Discriminator(tf.keras.model):
+class Discriminator(tf.keras.Model):
     """docstring for Discriminator."""
 
     def __init__(self, data_format):
