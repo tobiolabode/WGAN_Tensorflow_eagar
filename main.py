@@ -20,10 +20,10 @@ class Discriminator(tf.keras.Model):
 
     def __init__(self, data_format):
         super(Discriminator, self).__init__()
-        if data_format == "Channels_first":
+        if data_format == "channels_first":
             self._input_shape = [-1, 1, 28, 28]
         else:
-            assert data_format == "Channels_lasts"
+            assert data_format == "channels_lasts"
             self._input_shape = [-1, 28, 28, 1]
         self.conv1 = layers.Conv2D(
             64, 5, padding="SAME", data_format=data_format, activation=tf.tanh)
@@ -54,10 +54,10 @@ class Generator(tf.keras.Model):
 
         super(Generator, self).__init__(name="")
         self.data_format = data_format
-        if data_format == "Channels_first":
+        if data_format == "channels_first":
             self._pre_conv_shape = [-1, 128, 6, 6]
         else:
-            assert data_format == "Channels_lasts"
+            assert data_format == "channels_lasts"
             self._pre_conv_shape = [-1, 6, 6, 128]
         self.fc1 = layers.Dense(6 * 6 * 128, activation=tf.tanh)
 
