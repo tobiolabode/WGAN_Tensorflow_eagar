@@ -1,4 +1,4 @@
-# TODO: Turn GAN to WGAN
+# TODO: fix trainD fucntion
 
 """A deep MNIST classifier using convolutional layers.
 
@@ -156,7 +156,7 @@ def discriminator_loss(discriminator_real_outputs, discriminator_gen_outputs):
         label_smoothing=0.25)
     loss_on_generated = tf.losses.sigmoid_cross_entropy(
         tf.zeros_like(discriminator_gen_outputs), discriminator_gen_outputs)
-    loss = loss_on_real + loss_on_generated
+    loss = tf.reduce_mean(loss_on_real) - tf.reduce_mean(loss_on_generated)
     tf.contrib.summary.scalar('discriminator_loss', loss)
     return loss
 
@@ -179,6 +179,7 @@ def generator_loss(discriminator_gen_outputs):
     loss = tf.losses.sigmoid_cross_entropy(
         tf.ones_like(discriminator_gen_outputs), discriminator_gen_outputs)
     tf.contrib.summary.scalar('generator_loss', loss)
+    loss = tf.reduce_mean(loss)
     return loss
 
 
@@ -228,10 +229,14 @@ def train_one_epoch(generator, discriminator, generator_optimizer,
                 discriminator_real_outputs = discriminator(images)
                 discriminator_loss_val = discriminator_loss(discriminator_real_outputs,
                                                             discriminator_gen_outputs)
+
                 total_discriminator_loss += discriminator_loss_val
 
                 generator_loss_val = generator_loss(discriminator_gen_outputs)
                 total_generator_loss += generator_loss_val
+
+                total_discriminator_loss = tf.clip_by_value(discriminator_loss_val, -0.01, 0.01)
+                # cilpD = tf.unstack(cilpD)
 
             generator_grad = gen_tape.gradient(generator_loss_val,
                                                generator.variables)
@@ -248,6 +253,30 @@ def train_one_epoch(generator, discriminator, generator_optimizer,
                       'Average Discriminator Loss: %.6f' %
                       (batch_index, total_generator_loss / batch_index,
                        total_discriminator_loss / batch_index))
+
+
+ def trainD(discriminator,discriminator_optimizer):
+     total_generator_loss = 0.0
+     total_discriminator_loss = 0.0
+
+     for _ in range(5):
+        with tf.GradientTape() as gen_tape:
+             discriminator_gen_outputs = discriminator(generated_images)
+             discriminator_real_outputs = discriminator(images)
+             discriminator_loss_val = discriminator_loss(discriminator_real_outputs,
+                                                         discriminator_gen_outputs)
+
+             total_discriminator_loss += discriminator_loss_val
+             total_discriminator_loss = tf.clip_by_value(
+                 discriminator_loss_val, -0.01, 0.01)
+             discriminator_grad = disc_tape.gradient(discriminator_loss_val,
+                                                     discriminator.variables)
+
+             generator_optimizer.apply_gradients(
+                 zip(generator_grad, generator.variables))
+             discriminator_optimizer.apply_gradients(
+                 zip(discriminator_grad, discriminator.variables))
+
 
 
 def main(_):
@@ -288,6 +317,9 @@ def main(_):
             with summary_writer.as_default():
                 train_one_epoch(dataset=dataset, log_interval=FLAGS.log_interval,
                                 noise_dim=FLAGS.noise, **model_objects)
+                for _ in range(5):
+                    trainD()
+
             end = time.time()
             checkpoint.save(checkpoint_prefix)
             print('\nTrain time for epoch #%d (step %d): %f' %
