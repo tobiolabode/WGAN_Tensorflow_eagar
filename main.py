@@ -240,6 +240,7 @@ def train_one_epoch(generator, discriminator, generator_optimizer,
 
             generator_grad = gen_tape.gradient(generator_loss_val,
                                                generator.variables)
+
             discriminator_grad = disc_tape.gradient(discriminator_loss_val,
                                                     discriminator.variables)
 
@@ -255,28 +256,46 @@ def train_one_epoch(generator, discriminator, generator_optimizer,
                        total_discriminator_loss / batch_index))
 
 
- def trainD(discriminator,discriminator_optimizer):
-     total_generator_loss = 0.0
-     total_discriminator_loss = 0.0
+def trainD(generator, discriminator, generator_optimizer,
+           discriminator_optimizer, dataset, step_counter,
+           log_interval, noise_dim):
 
-     for _ in range(5):
-        with tf.GradientTape() as gen_tape:
-             discriminator_gen_outputs = discriminator(generated_images)
-             discriminator_real_outputs = discriminator(images)
-             discriminator_loss_val = discriminator_loss(discriminator_real_outputs,
-                                                         discriminator_gen_outputs)
+    total_discriminator_loss = 0.0
 
-             total_discriminator_loss += discriminator_loss_val
-             total_discriminator_loss = tf.clip_by_value(
-                 discriminator_loss_val, -0.01, 0.01)
-             discriminator_grad = disc_tape.gradient(discriminator_loss_val,
-                                                     discriminator.variables)
+    for (batch_index, images) in enumerate(dataset):
+        with tf.device('/cpu:0'):
+            tf.assign_add(step_counter, 1)
 
-             generator_optimizer.apply_gradients(
-                 zip(generator_grad, generator.variables))
-             discriminator_optimizer.apply_gradients(
-                 zip(discriminator_grad, discriminator.variables))
+        with tf.contrib.summary.record_summaries_every_n_global_steps(
+                log_interval, global_step=step_counter):
+            current_batch_size = images.shape[0]
+            noise = tf.random_uniform(
+                shape=[current_batch_size, noise_dim],
+                minval=-1.,
+                maxval=1.,
+                seed=batch_index)
 
+    with tf.GradientTape() as gen_tape:
+        generated_images = generator(noise)
+        tf.contrib.summary.image(
+            'generated_images',
+            tf.reshape(generated_images, [-1, 28, 28, 1]),
+            max_images=10)
+
+        discriminator_gen_outputs = discriminator(generated_images)
+        discriminator_real_outputs = discriminator(images)
+        discriminator_loss_val = discriminator_loss(discriminator_real_outputs,
+                                                    discriminator_gen_outputs)
+
+        total_discriminator_loss += discriminator_loss_val
+        total_discriminator_loss = tf.clip_by_value(
+            discriminator_loss_val, -0.01, 0.01)
+
+    discriminator_grad = gen_tape.gradient(discriminator_loss_val,
+                                           discriminator.variables)
+
+    discriminator_optimizer.apply_gradients(
+        zip(discriminator_grad, discriminator.variables))
 
 
 def main(_):
@@ -318,7 +337,8 @@ def main(_):
                 train_one_epoch(dataset=dataset, log_interval=FLAGS.log_interval,
                                 noise_dim=FLAGS.noise, **model_objects)
                 for _ in range(5):
-                    trainD()
+                    trainD(dataset=dataset, log_interval=FLAGS.log_interval,
+                           noise_dim=FLAGS.noise, **model_objects)
 
             end = time.time()
             checkpoint.save(checkpoint_prefix)
